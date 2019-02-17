@@ -66,7 +66,7 @@ bus.write_byte_data(0x39, 0x00 | 0x80, 0x03)
 
 while True:
     # get data from the DHT22 sensor
-    humidity, temperature = Adafruit_DHT.read_retry(dht22_sensor, DHT_DATA_PIN)
+    humidity, temperature = Adafruit_DHT.read_retry(dht11_sensor, DHT_DATA_PIN)
     if humidity is not None and temperature is not None:
         print('Temp={0:0.1f}*C Humidity={1:0.1f}%'.format(temperature, humidity))
 
