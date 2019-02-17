@@ -65,22 +65,18 @@ bus.write_byte_data(0x39, 0x00 | 0x80, 0x03)
 
 
 while True:
+    # get data from the DHT22 sensor
     humidity, temperature = Adafruit_DHT.read_retry(dht22_sensor, DHT_DATA_PIN)
     if humidity is not None and temperature is not None:
         print('Temp={0:0.1f}*C Humidity={1:0.1f}%'.format(temperature, humidity))
+
         # Send humidity and temperature feeds to Adafruit IO
         temperature = '%.2f'%(temperature)
         humidity = '%.2f'%(humidity)
         aio.send(temperature_feed.key, str(temperature))
         aio.send(humidity_feed.key, str(humidity))
-        
-    else:
-        print('Failed to get DHT22 Reading, trying again in ', DHT_READ_TIMEOUT, 'seconds')
-    # Timeout to avoid flooding Adafruit IO
-    time.sleep(DHT_READ_TIMEOUT)
-    
-    while True:
-    # TSL2561 address, 0x39(57)
+   
+# TSL2561 address, 0x39(57)
     # Select timing register, 0x01(01) with command register, 0x80(128)
     #		0x02(02)	Nominal integration time = 402ms
     bus.write_byte_data(0x39, 0x01 | 0x80, 0x02)
@@ -103,16 +99,15 @@ while True:
 
     if lux is not None:
         print('Full spectrum={0:0.1f} lux'.format(lux))
+        
         # Send lux feeds to Adafruit IO
         lux = '%.2f'%(lux)
         aio.send(lux_feed.key, str(lux))
+
+       
     else:
-        print('Failed to get TSL2561 Reading, trying again in ', LUX_READ_TIMEOUT, 'seconds')
-
+        print('Failed to get sensor Reading, trying again in ', DHT_READ_TIMEOUT, 'seconds')
     # Timeout to avoid flooding Adafruit IO
-    time.sleep(LUX_READ_TIMEOUT)
-
-    
-    
+    time.sleep(DHT_READ_TIMEOUT)
     
     
