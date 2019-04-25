@@ -184,6 +184,7 @@ void do_send(osjob_t* j){
             payload += String(" l:") + String(sensor_data.lux);
         else
             payload += String(" l:x");
+        Serial.println(payload.c_str());
 
         // Prepare upstream data transmission at the next possible time.
         LMIC_setTxData2(1, payload.c_str(), payload.length(), 0);
