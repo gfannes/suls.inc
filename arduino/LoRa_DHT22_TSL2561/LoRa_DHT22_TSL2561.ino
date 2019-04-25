@@ -1,3 +1,8 @@
+
+
+
+
+
 /*******************************************************************************
  * Copyright (c) 2015 Thomas Telkamp and Matthijs Kooijman
  *
@@ -46,6 +51,7 @@ void os_getArtEui (u1_t* buf) { }
 void os_getDevEui (u1_t* buf) { }
 void os_getDevKey (u1_t* buf) { }
 
+String payload;
 static uint8_t mydata[] = "Hello, world!";
 static osjob_t sendjob;
 
@@ -126,27 +132,107 @@ void onEvent (ev_t ev) {
     }
 }
 
+//Calibration factors for the different measurements
+struct SensorData
+{
+    //DHT22
+    float humidity = 0.0f;
+    float temperature = 0.0f;
+
+    //TSL2561
+    bool lux_ok = false;
+    float lux = 0.0f;
+};
+
+void setup_sensors(SensorData &calibration);
+void get_sensor_data(SensorData &sensor_data, const SensorData &calibration);
+
+SensorData calibration;
+
+#include <DHT.h>
+#include <Wire.h>
+#include <Adafruit_Sensor.h>
+#include <Adafruit_TSL2561_U.h>
+
+#define DHTPIN 5
+#define DHTTYPE DHT22
+DHT dht(DHTPIN, DHTTYPE);
+Adafruit_TSL2561_Unified tsl = Adafruit_TSL2561_Unified(TSL2561_ADDR_FLOAT, 12345);
+
+void setup_sensors(SensorData &calibration)
+{
+    dht.begin();
+
+    tsl.enableAutoRange(true);            /* Auto-gain ... switches automatically between 1x and 16x */
+    tsl.setIntegrationTime(TSL2561_INTEGRATIONTIME_402MS);  /* 16-bit data but slowest conversions, 402ms per measurement */
+
+    //TODO: Add real calibration values here
+    calibration.humidity = 1.0f;
+    calibration.temperature = 1.0f;
+    calibration.lux = 1.0f;
+}
+
+void get_sensor_data(SensorData &sensor_data, const SensorData &calibration)
+{
+    //Get raw sensor data
+    {
+        //Get raw data from DHT22 sensor
+        sensor_data.humidity = dht.readHumidity();
+        sensor_data.temperature = dht.readTemperature();
+
+        //Get raw data from TSL2561 sensor
+        {
+            sensors_event_t event;
+            tsl.getEvent(&event);
+
+            sensor_data.lux_ok = event.light;
+            if (sensor_data.lux_ok)
+                sensor_data.lux = event.light;
+        }
+    }
+
+    //Apply calibration
+    {
+        sensor_data.humidity    *= calibration.humidity;
+        sensor_data.temperature *= calibration.temperature;
+        sensor_data.lux         *= calibration.lux;
+    }
+}
+
 void do_send(osjob_t* j){
     // Check if there is not a current TX/RX job running
     if (LMIC.opmode & OP_TXRXPEND) {
         Serial.println(F("OP_TXRXPEND, not sending"));
     } else {
+        SensorData sensor_data;
         //Collect all data to send
-        //* Lux sensor
-        //* DHT22
+        get_sensor_data(sensor_data, calibration);
 
         //Serialize data into message
+        payload = String("t:") + String(sensor_data.temperature) + String(" h:") + String(sensor_data.humidity);
+        if (sensor_data.lux_ok)
+            payload = String(" l:") + String(sensor_data.lux);
+        else
+            payload = String(" l:x");
 
         // Prepare upstream data transmission at the next possible time.
-        LMIC_setTxData2(1, mydata, sizeof(mydata)-1, 0);
+        Serial.print("payload.c_str(): "); Serial.println(payload.c_str());
+        Serial.print("payload.length(): "); Serial.println(payload.length());
+        LMIC_setTxData2(1, payload.c_str(), payload.length(), 0);
+        /* LMIC_setTxData2(1, mydata, sizeof(mydata)-1, 0); */
         Serial.println(F("Packet queued"));
     }
     // Next TX is scheduled after TX_COMPLETE event.
 }
 
+
+
+
 void setup() {
     Serial.begin(115200);
     Serial.println(F("Starting"));
+
+    setup_sensors(calibration);
 
     #ifdef VCC_ENABLE
     // For Pinoccio Scout boards
